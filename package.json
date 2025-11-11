@@ -16,7 +16,7 @@
     "mongoose": "^8.19.1",
     "next": "15.5.4",
     "next-auth": "^4.24.11",
-    "nodemailer": "^7.0.10",
+    "nodemailer": "^6.9.0",
     "openai": "^6.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
