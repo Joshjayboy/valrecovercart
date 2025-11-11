@@ -1,0 +1,134 @@
+# ======================================================
+# 🩺 Post-Deploy Health Check + 🧠 AI Cron Jobs + Alerts
+# ======================================================
+
+name: RecoverCart Health & Intelligence Jobs
+
+on:
+  workflow_dispatch:
+  deployment_status:
+    types: [success]
+  schedule:
+    # ⏰ Daily Product Intelligence refresh (09:00 UTC)
+    - cron: '0 9 * * *'
+    # 🧠 Weekly AI warmup (Every Monday 10:00 UTC)
+    - cron: '0 10 * * 1'
+
+jobs:
+  # ======================================================
+  # 🩺 1. Post-Deploy Health Check
+  # ======================================================
+  healthcheck:
+    name: 🔍 Post-Deploy Health Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success'
+    env:
+      SITE_URL: ${{ secrets.SITE_URL }}
+    steps:
+      - name: 🔍 Check main page
+        run: |
+          echo "Checking main site..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SITE_URL}")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Main site failed with status $STATUS"
+            exit 1
+          fi
+
+      - name: 🔍 Check Cart-Copilot route
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SITE_URL}/dashboard/cart-copilot")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Cart-Copilot route failed with status $STATUS"
+            exit 1
+          fi
+
+      - name: 🔍 Check Shopify API endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SITE_URL}/api/shopify/products")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Shopify API failed with status $STATUS"
+            exit 1
+          fi
+
+      - name: ✅ Success message
+        if: ${{ success() }}
+        run: echo "✅ All health checks passed successfully."
+
+      - name: 🚨 Send failure alert (email)
+        if: ${{ failure() }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: "🚨 RecoverCart: Health Check Failed!"
+          to: ${{ secrets.ALERT_EMAIL }}
+          from: "RecoverCart Monitor"
+          body: |
+            One or more health checks failed on your deployed site.
+            Please investigate the issue at: ${{ secrets.SITE_URL }}
+
+  # ======================================================
+  # ⏰ 2. Daily Product Intelligence Cron
+  # ======================================================
+  daily-cron:
+    name: ⏰ Daily Product Intelligence Cron
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    env:
+      PROD_URL: ${{ secrets.PROD_URL }}
+    steps:
+      - name: Ping Product Intelligence cron endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${PROD_URL}/api/cron")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Daily cron failed with status $STATUS"
+            exit 1
+          fi
+          echo "✅ Daily cron executed successfully."
+
+      - name: 🚨 Send alert if cron fails
+        if: ${{ failure() }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: "⚠️ RecoverCart Daily Cron Failed"
+          to: ${{ secrets.ALERT_EMAIL }}
+          from: "RecoverCart AI Cron"
+          body: "The daily Product Intelligence cron job failed to run successfully on ${{ secrets.PROD_URL }}"
+
+  # ======================================================
+  # 🧠 3. Weekly AI Intelligence Warmup
+  # ======================================================
+  weekly-ai-warmup:
+    name: 🧠 Weekly AI Intelligence Warmup
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    env:
+      PROD_URL: ${{ secrets.PROD_URL }}
+    steps:
+      - name: Call Product Intelligence AI endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${PROD_URL}/api/ai/product-intelligence")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ AI Warmup failed with status $STATUS"
+            exit 1
+          fi
+          echo "✅ Weekly AI warmup successful."
+
+      - name: 🚨 Send alert if AI warmup fails
+        if: ${{ failure() }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: "🤖 RecoverCart AI Warmup Failed"
+          to: ${{ secrets.ALERT_EMAIL }}
+          from: "RecoverCart AI Monitor"
+          body: "The weekly AI warmup endpoint failed to respond correctly on ${{ secrets.PROD_URL }}"
