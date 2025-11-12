@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -7,25 +8,28 @@ import { useEffect, useState } from "react";
 export default function DashboardHome() {
   const router = useRouter();
   const [shopifyProducts, setShopifyProducts] = useState([]);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // 🧠 Example: fetch Shopify data (mock for now)
+  // ✅ Authentication Check
   useEffect(() => {
-    const fetchShopifyData = async () => {
-      try {
-        const response = await fetch("/api/shopify/products");
-        if (response.ok) {
-          const data = await response.json();
-          setShopifyProducts(data.products || []);
-        } else {
-          console.log("No Shopify data yet");
-        }
-      } catch (error) {
-        console.error("Error fetching Shopify data:", error);
-      }
-    };
+    const token = localStorage.getItem("authToken");
 
-    fetchShopifyData();
-  }, []);
+    if (!token) {
+      // 🚫 User not logged in → redirect to login
+      router.push("/login");
+    } else {
+      // ✅ User is logged in → continue rendering dashboard
+      setCheckingAuth(false);
+    }
+  }, [router]);
+
+  if (checkingAuth) {
+    return (
+      <div className="flex items-center justify-center h-screen text-blue-600 font-semibold">
+        Checking authentication...
+      </div>
+    );
+  }
 
   const modules = [
     {

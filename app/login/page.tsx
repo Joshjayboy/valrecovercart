@@ -11,26 +11,41 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-    });
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/users/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        }
+      );
 
-    setLoading(false);
+      const data = await response.json();
+      setLoading(false);
 
-    if (result?.error) {
-      setError("Invalid email or password");
-      return;
+      if (!response.ok) {
+        setError(data.error || "Invalid email or password");
+        return;
+      }
+
+      // ✅ Optionally, store token in localStorage (if backend returns it)
+      if (data.token) {
+        localStorage.setItem("authToken", data.token);
+      }
+
+      // ✅ Redirect to dashboard
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
     }
-
-    // ✅ Redirect to dashboard after successful login
-    router.push("/dashboard");
   };
 
   return (
